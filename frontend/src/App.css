@@ -1,0 +1,93 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background-color: #f0f2f5;
+}
+
+.chat-container {
+  max-width: 700px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+.messages-area {
+  flex: 1;
+  overflow-y: auto;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  word-wrap: break-word;
+}
+
+.message strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+  opacity: 0.7;
+}
+
+.message p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Message utilisateur — aligné à droite, bleu */
+.message.user {
+  align-self: flex-end;
+  background-color: #0084ff;
+  color: white;
+}
+
+/* Message assistant — aligné à gauche, gris clair */
+.message.assistant {
+  align-self: flex-start;
+  background-color: #e4e6eb;
+  color: #1c1e21;
+}
+
+.sources {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.spinner {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.input-area {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.input-area input {
+  flex: 1;
+  padding: 12px
