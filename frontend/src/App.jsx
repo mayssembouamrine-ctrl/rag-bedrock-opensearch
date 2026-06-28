@@ -5,25 +5,24 @@ function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [selectedSource, setSelectedSource] = useState(null)
 
   const sendMessage = async () => {
     if (!input.trim()) return
 
-    // Ajoute le message de l'utilisateur
     const userMessage = { role: 'user', content: input }
     setMessages((prev) => [...prev, userMessage])
     setInput('')
     setLoading(true)
 
     try {
-      const response = await fetch('http://13.50.232.42:8000/chat', {
+      const response = await fetch('http://16.16.92.153:8000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: input, top_k: 3 }),
       })
       const data = await response.json()
 
-      // Ajoute la réponse de l'IA
       const aiMessage = { role: 'assistant', content: data.answer, sources: data.sources }
       setMessages((prev) => [...prev, aiMessage])
     } catch (error) {
@@ -49,8 +48,19 @@ function App() {
           <div key={index} className={`message ${msg.role}`}>
             <strong>{msg.role === 'user' ? 'Vous' : 'Assistant'}</strong>
             <p>{msg.content}</p>
-            {msg.sources && (
-              <small className="sources">Sources : {msg.sources.join(', ')}</small>
+
+            {msg.sources && msg.sources.length > 0 && (
+              <div className="pills-container">
+                {msg.sources.map((src, i) => (
+                  <button
+                    key={i}
+                    className="source-pill"
+                    onClick={() => setSelectedSource(src)}
+                  >
+                    📄 {src.source.split('/').pop()} - p.{src.page}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         ))}
@@ -75,6 +85,20 @@ function App() {
           Envoyer
         </button>
       </div>
+
+      {/* Modale d'affichage de la source */}
+      {selectedSource && (
+        <div className="modal-overlay" onClick={() => setSelectedSource(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setSelectedSource(null)}>✕</button>
+            <h3>📄 {selectedSource.source.split('/').pop()}</h3>
+            <p className="modal-page">Page {selectedSource.page}</p>
+            <div className="modal-extract">
+              {selectedSource.extract}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
