@@ -11,9 +11,14 @@ class ChatRequest(BaseModel):
     query: str
     top_k: int = 3
 
+class SourceDetail(BaseModel):
+    source: str
+    page: int
+    extract: str
+
 class ChatResponse(BaseModel):
     answer: str
-    sources: List[str]
+    sources: List[SourceDetail]
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -26,20 +31,25 @@ async def chat(request: ChatRequest):
     results = indexer.search(request.query, k=request.top_k)
 
     context_chunks = []
-    sources = []
+    sources_seen = {}
     for r in results:
         context_chunks.append({
             "content": r["content"],
             "source": r["metadata"].get("source", "inconnu"),
             "page": r["metadata"].get("page", 0)
         })
-        sources.append(f"{r['metadata'].get('source')} - page {r['metadata'].get('page')}")
+        key = f"{r['metadata'].get('source')}-{r['metadata'].get('page')}"
+        if key not in sources_seen:
+            sources_seen[key] = SourceDetail(
+                source=r["metadata"].get("source", "inconnu"),
+                page=r["metadata"].get("page", 0),
+                extract=r["content"]
+            )
 
     # Étape 2 : Generation (Bedrock Claude)
     answer = generator.generate(request.query, context_chunks)
 
     return ChatResponse(
         answer=answer,
-        sources=list(set(sources))
+        sources=list(sources_seen.values())
     )
-
