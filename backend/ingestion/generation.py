@@ -12,8 +12,12 @@ class ResponseGenerator:
             for chunk in context_chunks
         ])
 
-        prompt = f"""Tu es un assistant qui répond UNIQUEMENT à partir du contexte fourni ci-dessous.
-Si la réponse n'est pas dans le contexte, dis que tu ne sais pas.
+        prompt = f"""Tu es un assistant strict qui répond UNIQUEMENT à partir du contexte fourni ci-dessous.
+
+RÈGLES ABSOLUES :
+- Si le contexte ne contient PAS l'information demandée, réponds EXACTEMENT : "Je ne sais pas, cette information n'est pas présente dans les documents disponibles."
+- N'utilise JAMAIS tes connaissances générales pour compléter une réponse.
+- Ne fais AUCUNE supposition ou extrapolation au-delà de ce qui est explicitement écrit dans le contexte.
 
 CONTEXTE:
 {context_text}

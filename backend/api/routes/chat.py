@@ -7,6 +7,8 @@ from ingestion.generation import ResponseGenerator
 router = APIRouter()
 generator = ResponseGenerator()
 
+SIMILARITY_THRESHOLD = 0.6  # Au-delà de ce score, on considère le chunk non pertinent
+
 class ChatRequest(BaseModel):
     query: str
     top_k: int = 3
@@ -22,7 +24,7 @@ class ChatResponse(BaseModel):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Endpoint de génération de réponse RAG"""
+    """Endpoint de génération de réponse RAG avec filtrage anti-hallucination"""
 
     if not chunks:
         raise HTTPException(status_code=404, detail="Aucun document indexé")
@@ -30,9 +32,19 @@ async def chat(request: ChatRequest):
     # Étape 1 : Retrieval (réutilise RAG-36)
     results = indexer.search(request.query, k=request.top_k)
 
+    # 🛡️ Filtrage anti-hallucination : on ne garde que les chunks pertinents
+    relevant_results = [r for r in results if r["score"] < SIMILARITY_THRESHOLD]
+
+    # Si aucun chunk n'est suffisamment pertinent → réponse directe sans appeler le LLM
+    if not relevant_results:
+        return ChatResponse(
+            answer="Je ne sais pas. Aucune information pertinente n'a été trouvée dans la base de connaissances pour répondre à cette question.",
+            sources=[]
+        )
+
     context_chunks = []
     sources_seen = {}
-    for r in results:
+    for r in relevant_results:
         context_chunks.append({
             "content": r["content"],
             "source": r["metadata"].get("source", "inconnu"),
