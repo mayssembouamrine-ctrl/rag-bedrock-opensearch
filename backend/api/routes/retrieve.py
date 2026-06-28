@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from api.models.schemas import RetrieveRequest, RetrieveResponse, DocumentResult
 from ingestion.pdf_ressources import PDFProcessor
-from ingestion.embeddings_bedrock import BedrockEmbeddingsIndexer
+from ingestion.opensearch_indexer import OpenSearchIndexer
 
 router = APIRouter()
 
 # Initialisation du pipeline au démarrage
 processor = PDFProcessor(chunk_size=1000, chunk_overlap=200)
-indexer = BedrockEmbeddingsIndexer()
+indexer = OpenSearchIndexer()
 
 # Charger et indexer les documents
 chunks = processor.process_folder("data")
@@ -16,7 +16,7 @@ if chunks:
 
 @router.post("/retrieve", response_model=RetrieveResponse)
 async def retrieve(request: RetrieveRequest):
-    """Endpoint de recherche sémantique"""
+    """Endpoint de recherche sémantique via OpenSearch Serverless"""
 
     if not chunks:
         raise HTTPException(status_code=404, detail="Aucun document indexé")
@@ -38,4 +38,3 @@ async def retrieve(request: RetrieveRequest):
         results=documents,
         total=len(documents)
     )
-
