@@ -6,7 +6,7 @@ from ingestion.opensearch_indexer import OpenSearchIndexer
 router = APIRouter()
 
 # Initialisation du pipeline au démarrage
-processor = PDFProcessor(chunk_size=1000, chunk_overlap=200)
+processor = PDFProcessor()  # RAG-11 : utilise les valeurs optimisées (500/50)
 indexer = OpenSearchIndexer()
 
 # Charger et indexer les documents
