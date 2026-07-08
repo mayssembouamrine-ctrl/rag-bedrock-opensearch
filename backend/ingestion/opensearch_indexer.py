@@ -1,3 +1,4 @@
+import time
 import boto3
 import json
 from opensearchpy import OpenSearch, RequestsHttpConnection
@@ -20,34 +21,61 @@ class OpenSearchIndexer:
 
     def create_index_if_not_exists(self, dimension=1024):
         if self.client.indices.exists(index=self.index_name):
-            self.client.indices.delete(index=self.index_name)
-            print(f"Index supprime")
+            print("Index existant conserve")
+            return
         index_body = {
             "settings": {"index": {"knn": True}},
-            "mappings": {"properties": {
-                "embedding": {"type": "knn_vector", "dimension": dimension},
-                "content": {"type": "text"},
-                "source": {"type": "keyword"},
-                "page": {"type": "integer"}
-            }}
+            "mappings": {
+                "properties": {
+                    "embedding": {"type": "knn_vector", "dimension": dimension},
+                    "content": {"type": "text"},
+                    "source": {"type": "keyword"},
+                    "page": {"type": "integer"}
+                }
+            }
         }
         self.client.indices.create(index=self.index_name, body=index_body)
-        print(f"Index cree")
+        print("Index cree")
+        time.sleep(15)
+        print("Index pret")
 
     def index_chunks(self, chunks: list):
         self.create_index_if_not_exists()
         print(f"Indexation de {len(chunks)} chunks...")
         for chunk in chunks:
             embedding = self.embed_text(chunk.page_content)
-            doc = {"embedding": embedding, "content": chunk.page_content, "source": chunk.metadata.get("source", "inconnu"), "page": chunk.metadata.get("page", 0)}
+            doc = {
+                "embedding": embedding,
+                "content": chunk.page_content,
+                "source": chunk.metadata.get("source", "inconnu"),
+                "page": chunk.metadata.get("page", 0)
+            }
             self.client.index(index=self.index_name, body=doc)
         print(f"{len(chunks)} chunks indexes dans OpenSearch Serverless")
 
     def search(self, query: str, k: int = 3):
         query_vector = self.embed_text(query)
-        search_body = {"size": k, "query": {"knn": {"embedding": {"vector": query_vector, "k": k}}}}
+        search_body = {
+            "size": k,
+            "query": {
+                "knn": {
+                    "embedding": {
+                        "vector": query_vector,
+                        "k": k
+                    }
+                }
+            }
+        }
         response = self.client.search(index=self.index_name, body=search_body)
         results = []
         for rank, hit in enumerate(response["hits"]["hits"]):
-            results.append({"rank": rank + 1, "score": 1 - hit["_score"], "content": hit["_source"]["content"][:200], "metadata": {"source": hit["_source"]["source"], "page": hit["_source"]["page"]}})
+            results.append({
+                "rank": rank + 1,
+                "score": 1 - hit["_score"],
+                "content": hit["_source"]["content"][:200],
+                "metadata": {
+                    "source": hit["_source"]["source"],
+                    "page": hit["_source"]["page"]
+                }
+            })
         return results
