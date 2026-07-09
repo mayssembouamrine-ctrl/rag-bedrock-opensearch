@@ -1,3 +1,4 @@
+from ingestion.query_expander import QueryExpander
 from fastapi import APIRouter, HTTPException
 from api.models.schemas import RetrieveRequest, RetrieveResponse, DocumentResult
 from ingestion.pdf_ressources import PDFProcessor
@@ -9,7 +10,7 @@ router = APIRouter()
 processor = PDFProcessor()
 indexer = OpenSearchIndexer()
 reranker = Reranker(vector_weight=0.6, bm25_weight=0.4)
-
+expander = QueryExpander()
 chunks = processor.process_folder("data")
 if chunks:
     indexer.index_chunks(chunks)
@@ -19,14 +20,12 @@ async def retrieve(request: RetrieveRequest):
     if not chunks:
         raise HTTPException(status_code=404, detail="Aucun document indexé")
 
-    # Étape 1 : Recherche vectorielle k-NN
-    vector_results = indexer.search(request.query, k=request.top_k)
+    # RAG-28 : Expansion de la requête si elle est trop courte
+    expanded_query = expander.expand(request.query)
 
-    # Étape 2 : Recherche hybride RRF (RAG-21)
-    hybrid_results = reranker.hybrid_search(request.query, vector_results, chunks)
-
-    # Étape 3 : Re-ranking final (RAG-12)
-    reranked = reranker.rerank(request.query, hybrid_results)
+    vector_results = indexer.search(expanded_query, k=request.top_k)
+    hybrid_results = reranker.hybrid_search(expanded_query, vector_results, chunks)
+    reranked = reranker.rerank(expanded_query, hybrid_results)
 
     documents = []
     for r in reranked:
