@@ -1,11 +1,12 @@
 import os
+import re
 from PyPDF2 import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 class PDFProcessor:
     # RAG-11 : Configuration optimisée après tests comparatifs
     # Configs testées : (500/50), (1000/200), (1500/300)
-    # Résultat : 500/50 donne plus de chunks précis = meilleure pertinence de recherche
+    # Résultat : 500/50 donne plus de chunks précis
     def __init__(self, chunk_size=500, chunk_overlap=50):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -15,28 +16,34 @@ class PDFProcessor:
             separators=["\n\n", "\n", ".", " ", ""]
         )
 
+    def preprocess_text(self, text: str) -> str:
+        """RAG-22 : Nettoyage et normalisation du texte avant chunking"""
+        text = re.sub(r'[^\S\n]+', ' ', text)
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = '\n'.join(line.strip() for line in text.split('\n'))
+        text = text.strip()
+        return text
+
     def split_into_chunks(self, pages: list) -> list:
         """Découpe le texte en chunks avec métadonnées par page"""
         all_chunks = []
         for page_num, (text, source) in enumerate(pages):
             chunks = self.text_splitter.create_documents(
                 texts=[text],
-                metadatas=[{
-                    "source": source,
-                    "page": page_num + 1
-                }]
+                metadatas=[{"source": source, "page": page_num + 1}]
             )
             all_chunks.extend(chunks)
         return all_chunks
 
     def process_pdf(self, pdf_path: str) -> list:
-        """Pipeline complet : extraction + chunking"""
+        """Pipeline complet : extraction + preprocessing + chunking"""
         print(f"📄 Traitement de : {pdf_path}")
         reader = PdfReader(pdf_path)
         pages = []
         for page_num, page in enumerate(reader.pages):
             page_text = page.extract_text()
             if page_text:
+                page_text = self.preprocess_text(page_text)
                 pages.append((page_text, pdf_path))
         print(f"✅ Pages extraites : {len(pages)}")
         chunks = self.split_into_chunks(pages)
