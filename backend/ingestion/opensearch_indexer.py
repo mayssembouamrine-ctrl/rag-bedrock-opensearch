@@ -1,6 +1,7 @@
 import time
 import boto3
 import json
+from concurrent.futures import ThreadPoolExecutor
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from requests_aws4auth import AWS4Auth
 
@@ -41,8 +42,9 @@ class OpenSearchIndexer:
 
     def index_chunks(self, chunks: list):
         self.create_index_if_not_exists()
-        print(f"Indexation de {len(chunks)} chunks...")
-        for chunk in chunks:
+        print(f"Indexation parallele de {len(chunks)} chunks...")
+
+        def index_one(chunk):
             embedding = self.embed_text(chunk.page_content)
             doc = {
                 "embedding": embedding,
@@ -51,8 +53,12 @@ class OpenSearchIndexer:
                 "page": chunk.metadata.get("page", 0)
             }
             self.client.index(index=self.index_name, body=doc)
-        print(f"{len(chunks)} chunks indexes dans OpenSearch Serverless")
 
+        # RAG-30 : Parallélisation avec 3 threads simultanés
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            executor.map(index_one, chunks)
+
+        print(f"{len(chunks)} chunks indexes en parallele dans OpenSearch Serverless") 
     def search(self, query: str, k: int = 3):
         query_vector = self.embed_text(query)
         search_body = {
