@@ -8,7 +8,7 @@ from ingestion.generation import ResponseGenerator
 router = APIRouter()
 generator = ResponseGenerator()
 
-SIMILARITY_THRESHOLD = 0.6   # Seuil anti-hallucination (RAG-41)
+SIMILARITY_THRESHOLD = 0.8   # Seuil anti-hallucination (RAG-41)
 MAX_TOP_K = 5                 # Plafond dur sur le nombre de chunks (RAG-42)
 MAX_CONTEXT_TOKENS = 4000     # Limite de sécurité pour le contexte envoyé à Claude (RAG-42)
 
@@ -40,12 +40,20 @@ async def chat(request: ChatRequest):
     # 🛡️ RAG-42 : on plafonne top_k, peu importe ce que demande le client
     safe_top_k = min(request.top_k, MAX_TOP_K)
 
-    # Étape 1 : Retrieval (réutilise RAG-36)
-    results = indexer.search(request.query, k=safe_top_k)
+    # RAG-28 : expansion de requête
+    from ingestion.query_expander import QueryExpander
+    from ingestion.reranker import Reranker
+    expander = QueryExpander()
+    reranker = Reranker()
+    expanded_query = expander.expand(request.query)
 
-    # 🛡️ RAG-41 : filtrage anti-hallucination
-    relevant_results = [r for r in results if r["score"] < SIMILARITY_THRESHOLD]
+    # Pipeline complet : vectoriel + hybride + re-ranking
+    vector_results = indexer.search(expanded_query, k=safe_top_k)
+    hybrid_results = reranker.hybrid_search(expanded_query, vector_results, chunks)
+    results = reranker.rerank(expanded_query, hybrid_results)
 
+    # Filtre anti-hallucination sur le score combiné
+    relevant_results = [r for r in results if r.get("combined_score", 1.0) > 0.1]
     if not relevant_results:
         return ChatResponse(
             answer="Je ne sais pas. Aucune information pertinente n'a été trouvée dans la base de connaissances pour répondre à cette question.",
